@@ -5,13 +5,16 @@ import (
       "flag"
       "strings"
       "strconv"
+
       "net/http"
+      "expvar"
+
       "github.com/jsirianni/gocronlib"
 )
 
 
 const (
-      version     string = "2.1.0"
+      version     string = "2.2.0"
       libVersion  string = gocronlib.Version
       errorResp   string = "Internal Server Error"
       contentType string = "plain/text"
@@ -21,12 +24,18 @@ var ( // Flags set in main()
       port       string
       verbose    bool
       getVersion bool
+      noProxy    bool
+)
+
+var ( // Metric variables NOTE: Placeholder in order to compile
+    fooCount = expvar.NewInt("foo.count")
 )
 
 
 func main() {
       flag.BoolVar(&getVersion, "version", false, "Get the version and then exit")
       flag.BoolVar(&verbose, "verbose", false, "Enable verbose output")
+      flag.BoolVar(&noProxy, "no-proxy", false, "Listens on all interfaces - Use this for debugging only!")
       flag.StringVar(&port, "p", "8080", "Listening port for the web server")
       flag.Parse()
 
@@ -36,16 +45,22 @@ func main() {
             return
       }
 
-      if verbose == true {
-            fmt.Println("Verbose mode enabled")
-            fmt.Println("gocron-front version: " + version)
-            fmt.Println("gocronlib version: " + libVersion)
-            fmt.Println("Starting web server on port: " + port)
-      }
+      gocronlib.CronLog("Verbose mode enabled", verbose)
+      gocronlib.CronLog("gocron-front version: " + version, verbose)
+      gocronlib.CronLog("gocronlib version: " + libVersion, verbose)
+      gocronlib.CronLog("Starting web server on port: " + port, verbose)
+
 
       // Start the web server
       http.HandleFunc("/", cronStatus)
-      http.ListenAndServe(":" + port, nil)
+
+      if noProxy == true {
+          gocronlib.CronLog("WARNING: --no-proxy passed, listening on all interfaces. This flag should only be used for debuging only." +
+              "The metrics API is exposed, without authentication. Production systems should use a proxy, such as nginx. Please view the readme at https://github.com/jsirianni/gocron", verbose)
+          http.ListenAndServe(":" + port, nil)
+      } else {
+          http.ListenAndServe("localhost:" + port, nil)
+      }
 }
 
 
